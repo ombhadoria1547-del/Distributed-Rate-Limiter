@@ -312,7 +312,7 @@ Go application successfully reading and writing Redis data.
 
 Status:
 
-⬜ Pending
+✅ Completed
 
 ---
 
@@ -599,7 +599,7 @@ Never leave major completed work uncommitted.
 
 ✅ Gin Hello World
 
-⬜ Redis Connectivity
+✅ Redis Connectivity
 
 ⬜ Token Bucket
 
@@ -783,6 +783,7 @@ Distributed-Rate-Limiter/
 ├── experiments/
 │
 └── source/
+```
 
 ---
 
@@ -867,27 +868,98 @@ Redis Fundamentals — Redis Data Types, Persistence, Containers, Go ↔ Redis C
 
 ---
 
+## Day 5 — Redis Fundamentals
+
+Date:
+
+2026-07-07
+
+Hours Spent:
+
+~3 Hours
+
+Topics Learned:
+
+* What Redis actually is — conceptually, a `map[string]string` living outside the application
+* Why Redis exists: application memory disappears on restart, so token counts can't live only in a Go variable
+* Why multiple Go server instances need a shared store instead of separate in-process maps
+* Redis Data Types (conceptual only, not deep): String, Hash, Sorted Set
+* String → simple key/value (e.g. `username = om`)
+* Hash → grouped fields under one key (e.g. `user:1 → name, age`)
+* Sorted Set → values with scores (previewed for future Sliding Window use)
+* Why Redis is run in Docker instead of installed directly (environment consistency, matches real company practice)
+* Docker commands conceptually: `docker pull redis`, `docker run redis`, `docker ps`
+* Redis client for Go: `github.com/redis/go-redis/v9`
+* `client := redis.NewClient(...)` creates the connection
+* Performing a `SET` and `GET` from a Go program and printing the retrieved value
+* How today's `username = om` exercise maps directly onto the future rate limiter schema (`client:{id} → tokens, last_refill`) — same mechanism, different data
+
+Files Created:
+
+* main.go (updated with Redis connection, SET, and GET logic)
+
+Problems Faced:
+
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* Redis is an in-memory database used to store state outside the Go application
+* A rate limiter needs Redis because token counts must survive requests and server restarts
+* Go maps are insufficient because they vanish on restart and can't be shared across multiple server instances
+* The Go Redis client (`go-redis/v9`) handles the connection; `SET`/`GET` round-trip correctly from Go to Redis and back
+* Today's exercise (`username = om`) is functionally identical to the future bucket state (`tokens`, `last_refill`) — only the data changes, not the mechanism
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+feat: redis connectivity
+
+Outcome:
+
+✅ Redis container running locally
+
+✅ Go application successfully connected to Redis
+
+✅ Performed SET from Go
+
+✅ Performed GET from Go
+
+✅ Retrieved value printed and verified correct
+
+✅ Understood why Redis exists and why Go maps are insufficient
+
+✅ Commit pushed: "feat: redis connectivity"
+
+Next Objective:
+
+Token Bucket — Refill Logic, Consumption Logic, Burst Handling (In-Memory Token Bucket)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## Redis Fundamentals
+## Token Bucket
 
 Objectives:
 
-* Redis Data Types
-* Redis Persistence
-* Redis Containers
-* Go ↔ Redis Connectivity
+* Refill Logic
+* Consumption Logic
+* Burst Handling
 
 Deliverable:
 
-Go application successfully reading and writing Redis data.
+In-Memory Token Bucket
 
 Completion Criteria:
 
-* Understand core Redis data types
-* Run Redis in a container
-* Connect to Redis from a Go application
-* Successfully read and write a key from Go
+* Implement refill logic based on elapsed time and rate
+* Implement consumption logic that decrements available tokens
+* Handle burst capacity correctly (cap at max tokens)
+* Verify behavior with a simple in-memory (non-Redis) prototype before wiring in Redis/Lua
 
 Status:
 
@@ -902,7 +974,7 @@ Foundation
 ██████████ 100%
 
 Backend Basics
-█████░░░░░ 50%
+██████████ 100%
 
 Rate Limiter Core
 ░░░░░░░░░░ 0%
@@ -919,7 +991,7 @@ Documentation
 
 Current Estimated Progress:
 
-~20%
+~30%
 
 ---
 
