@@ -293,7 +293,7 @@ GET /ping
 
 Status:
 
-⏳ Current Milestone
+✅ Completed
 
 ---
 
@@ -597,7 +597,7 @@ Never leave major completed work uncommitted.
 ```text
 ✅ Git Learning
 
-⬜ Gin Hello World
+✅ Gin Hello World
 
 ⬜ Redis Connectivity
 
@@ -784,40 +784,110 @@ Distributed-Rate-Limiter/
 │
 └── source/
 
-# 🎯 CURRENT MILESTONE
+---
 
-## HTTP Fundamentals + Gin Framework
+## Day 4 — HTTP Fundamentals + Gin Framework
 
-Objectives:
+Date:
 
-* Understand HTTP
-* Learn Request / Response Flow
-* Learn Status Codes
-* Learn Headers
-* Learn REST Basics
-* Learn Gin Framework
-* Build First HTTP Server
+2026-07-07
 
-Deliverable:
+Hours Spent:
+
+~3–4 Hours
+
+Topics Learned:
+
+* HTTP Request / Response Flow
+* HTTP Methods (GET, POST, PUT, DELETE)
+* Status Codes (200, 400, 404, 429, 500)
+* Headers (conceptual understanding)
+* JSON structure (keys, values, objects)
+* Installing and using Gin (`go get github.com/gin-gonic/gin`)
+* Building a Gin server with `gin.Default()` and `router.Run(":8080")`
+* Query Parameters (`c.Query("name")`)
+* Path Parameters (`c.Param("id")`)
+* Difference between query params and path params
+* Manual testing via browser
+
+Files Created:
+
+* main.go (updated with Gin routes)
+
+Endpoints Built:
 
 ```text
 GET /ping
+GET /hello
+GET /user?name=om
+GET /user/:id
 ```
 
-Expected Response:
+Problems Faced:
 
-```json
-{
-    "message": "pong"
-}
-```
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* `router := gin.Default()` creates the server instance
+* `router.GET(...)` registers a route handler for incoming GET requests
+* `c.JSON(...)` sends a JSON response back to the client
+* Query parameters (`?name=om`) and path parameters (`/user/123`) are handled differently but serve a similar purpose
+* This exact query-parameter mechanism (`?client_id=abc`) is what the future `/check` endpoint will rely on
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+feat: gin hello world
+
+Outcome:
+
+✅ Understood HTTP request/response flow
+
+✅ Understood GET/POST and status codes
+
+✅ Understood JSON structure
+
+✅ Installed Gin
+
+✅ Built a running API with 4 working endpoints
+
+✅ Handled query parameters and path parameters
+
+✅ Tested all endpoints successfully in browser
+
+✅ Commit pushed: "feat: gin hello world"
+
+Next Objective:
+
+Redis Fundamentals — Redis Data Types, Persistence, Containers, Go ↔ Redis Connectivity
+
+---
+
+# 🎯 CURRENT MILESTONE
+
+## Redis Fundamentals
+
+Objectives:
+
+* Redis Data Types
+* Redis Persistence
+* Redis Containers
+* Go ↔ Redis Connectivity
+
+Deliverable:
+
+Go application successfully reading and writing Redis data.
 
 Completion Criteria:
 
-* Understand HTTP basics
-* Build Gin server
-* Successfully return JSON response
-* Understand routing fundamentals
+* Understand core Redis data types
+* Run Redis in a container
+* Connect to Redis from a Go application
+* Successfully read and write a key from Go
 
 Status:
 
@@ -832,7 +902,7 @@ Foundation
 ██████████ 100%
 
 Backend Basics
-██░░░░░░░░ 20%
+█████░░░░░ 50%
 
 Rate Limiter Core
 ░░░░░░░░░░ 0%
@@ -849,7 +919,7 @@ Documentation
 
 Current Estimated Progress:
 
-~15%
+~20%
 
 ---
 
