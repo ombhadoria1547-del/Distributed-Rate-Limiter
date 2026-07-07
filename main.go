@@ -16,5 +16,23 @@ func main() {
 		})
 	})
 
+	router.GET("/user", func(c *gin.Context) {
+
+		name := c.Query("name")
+
+		c.JSON(http.StatusOK, gin.H{
+			"user": name,
+		})
+	})
+
+	router.GET("/user/:id", func(c *gin.Context) {
+
+		id := c.Param("id")
+
+		c.JSON(http.StatusOK, gin.H{
+			"id": id,
+		})
+	})
+
 	router.Run(":8080")
 }
