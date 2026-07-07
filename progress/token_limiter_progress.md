@@ -681,7 +681,108 @@ Outcome:
 
 Comfortable understanding and writing Go code required for this project.
 
----
+
+## Day 3 — Environment Setup & Repository Initialization
+
+Date:
+
+2026-07-04
+
+Hours Spent:
+
+~3 Hours
+
+Topics Learned:
+
+* Go Installation
+* Go Environment Setup
+* Go Modules
+* Repository Structure Planning
+* Git Commit Workflow
+* GitHub Repository Management
+
+Files Created:
+
+* README.md
+* go.mod
+* main.go
+
+Folders Created:
+
+* roadmap/
+* progress/
+* docs/
+* notes/
+* experiments/
+* source/
+
+Problems Faced:
+
+* Broken Go installation
+* Incorrect PATH configuration
+* Git Bash unable to locate Go executable
+* Go command not recognized by terminal
+
+Resolution:
+
+* Reinstalled Go
+* Verified installation using go version
+* Successfully initialized Go module
+* Executed first Go program
+* Verified GitHub repository synchronization
+
+Key Learnings:
+
+* Difference between git add, git commit and git push
+* Purpose of go.mod
+* Structure of a professional Go project
+* Repository initialization workflow
+* Basic Go compilation and execution workflow
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+chore: initialize project structure
+
+Outcome:
+
+✅ Go installed and working
+
+✅ Repository created and linked with GitHub
+
+✅ Project structure initialized
+
+✅ Go module initialized
+
+✅ First Go program executed successfully
+
+✅ Initial project commit pushed
+
+Current Workspace:
+
+```text
+Distributed-Rate-Limiter/
+│
+├── README.md
+├── go.mod
+├── main.go
+│
+├── roadmap/
+│   └── token-bucket-rate-limiter-roadmap.md
+│
+├── progress/
+│   └── token_limiter_progress.md
+│
+├── docs/
+│
+├── notes/
+│
+├── experiments/
+│
+└── source/
 
 # 🎯 CURRENT MILESTONE
 
