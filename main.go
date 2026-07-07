@@ -16,9 +16,22 @@ func main() {
 		})
 	})
 
+	router.GET("/hello", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "hello",
+		})
+	})
+
 	router.GET("/user", func(c *gin.Context) {
 
 		name := c.Query("name")
+
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "name query parameter is required",
+			})
+			return
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"user": name,
