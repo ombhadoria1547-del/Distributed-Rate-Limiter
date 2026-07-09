@@ -338,7 +338,7 @@ In-Memory Token Bucket
 
 Status:
 
-⬜ Pending
+✅ Completed
 
 ---
 
@@ -601,7 +601,7 @@ Never leave major completed work uncommitted.
 
 ✅ Redis Connectivity
 
-⬜ Token Bucket
+✅ Token Bucket
 
 ⬜ Lua Integration
 
@@ -940,30 +940,93 @@ Token Bucket — Refill Logic, Consumption Logic, Burst Handling (In-Memory Toke
 
 ---
 
+## Day 6 — Token Bucket (In-Memory Implementation)
+
+Topics Learned:
+
+* Why Rate Limiting exists — API abuse, resource exhaustion, denial of service, fair resource sharing, protecting backend systems
+* Why simply adding more servers does not solve the abuse problem
+* Why a simple request counter and Fixed Window approaches are insufficient
+* Why Token Bucket was invented — smooth traffic flow, burst handling, average rate enforcement
+* Core Token Bucket concepts: Bucket, Tokens, Capacity, Refill Rate, Consumption, Allow, Deny, Burst Capacity
+* Mathematics behind Token Bucket: elapsed time, refill formula, why bucket size never exceeds capacity, why refill is calculated lazily instead of every second
+* Designing the in-memory data structure: Current Tokens, Maximum Capacity, Refill Rate, Last Refill Timestamp — and why each field is required
+* Translating the design into a working Go implementation
+
+Files Created:
+
+* source/tokenbucket.go (Token Bucket struct + refill/consume logic)
+* main.go (updated to exercise the Token Bucket manually)
+
+Problems Faced:
+
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* A Token Bucket is fully described by four values: current tokens, max capacity, refill rate, and last refill timestamp
+* Refill is calculated lazily — based on elapsed time since the last refill — rather than running a background timer every second
+* Consumption logic must recalculate refill first, then attempt to deduct a token, so state is always current before an Allow/Deny decision is made
+* Bucket size must always be capped at maximum capacity, even after a long idle period
+* Validating an algorithm with manual test scenarios (full bucket, drain to empty, wait-and-refill, burst) builds real trust in the logic before adding Redis/Lua complexity
+* This in-memory version is deliberately disposable — it exists to prove correctness before the same logic is ported into a Redis-backed, Lua-atomic implementation
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+feat: token bucket algorithm (in-memory)
+
+Outcome:
+
+✅ Working in-memory Token Bucket implementation
+
+✅ Refill logic implemented and verified
+
+✅ Consumption logic implemented and verified
+
+✅ Burst handling verified (bucket never exceeds capacity)
+
+✅ Manual test scenarios run and validated
+
+✅ Progress tracker updated
+
+✅ Roadmap synchronized
+
+✅ Commit pushed: "feat: token bucket algorithm (in-memory)"
+
+Next Objective:
+
+Redis Lua Scripting — Atomic Operations, Redis EVAL, Race Condition Prevention (Redis-backed Token Bucket)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## Token Bucket
+## Redis Lua Scripting
 
 Objectives:
 
-* Refill Logic
-* Consumption Logic
-* Burst Handling
+* Atomic Operations
+* Redis EVAL
+* Race Condition Prevention
 
 Deliverable:
 
-In-Memory Token Bucket
+Redis-backed Token Bucket
 
 Completion Criteria:
 
-* Implement refill logic based on elapsed time and rate
-* Implement consumption logic that decrements available tokens
-* Handle burst capacity correctly (cap at max tokens)
-* Verify behavior with a simple in-memory (non-Redis) prototype before wiring in Redis/Lua
+* Port the in-memory Token Bucket logic into a Redis-backed implementation
+* Implement the refill + consume logic as an atomic Lua script executed via EVAL
+* Verify no race conditions occur under concurrent requests
+* Confirm bucket state persists correctly in Redis between requests
 
 Status:
 
-⏳ In Progress
+⬜ Pending
 
 ---
 
@@ -977,7 +1040,7 @@ Backend Basics
 ██████████ 100%
 
 Rate Limiter Core
-░░░░░░░░░░ 0%
+███░░░░░░░ 30%
 
 Advanced Features
 ░░░░░░░░░░ 0%
@@ -991,7 +1054,7 @@ Documentation
 
 Current Estimated Progress:
 
-~30%
+~35%
 
 ---
 
