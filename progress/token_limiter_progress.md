@@ -377,7 +377,7 @@ Resume-Ready MVP
 
 Status:
 
-⬜ Pending
+✅ Completed
 
 ---
 
@@ -396,7 +396,7 @@ DELETE /admin/clients
 
 Status:
 
-⬜ Pending
+🟡 In Progress (Next Up)
 
 ---
 
@@ -561,6 +561,13 @@ token-limiter/
 └── README.md
 ```
 
+Current Additions (as of Day 8):
+
+```text
+Dockerfile
+docker-compose.yml
+```
+
 Future additions:
 
 ```text
@@ -568,8 +575,6 @@ cmd/
 internal/
 scripts/
 loadtest/
-Dockerfile
-docker-compose.yml
 ```
 
 As project progresses, workspace structure must remain synchronized with roadmap milestones.
@@ -605,7 +610,7 @@ Never leave major completed work uncommitted.
 
 ✅ Lua Integration
 
-⬜ Docker Compose
+✅ Docker Compose
 
 ⬜ Admin API
 
@@ -1081,29 +1086,122 @@ MVP Completion — Docker Compose, finalized `/check` Endpoint, Rate Limit Heade
 
 ---
 
+## Day 8 — Resume-Ready MVP Completion (Docker Compose + Production API)
+
+Date:
+
+2026-07-12
+
+Hours Spent:
+
+~5–6 Hours
+
+Topics Learned:
+
+* Why "works on my machine" is a real production problem and why companies never install software manually on servers
+* Container vs Image vs Docker Compose vs Multi-container Application — the conceptual difference between each
+* Dockerfile fundamentals — Base Image, Layers, Build Context, `COPY`, `RUN`, `CMD`, `EXPOSE`, and why every instruction creates a new layer
+* How a Go application is converted into a runnable Docker image, and a conceptual preview of multi-stage builds
+* Writing the project's own `Dockerfile` — selecting a Go base image, copying source, downloading dependencies, building the binary, and running it
+* Docker Compose fundamentals — `docker-compose.yml`, Services, Networks, Volumes, Port Mapping
+* Writing `docker-compose.yml` to orchestrate the Go service and the Redis service together
+* Container networking — Bridge Networks, Container DNS, Service Discovery, and why `localhost:6379` must become `redis:6379` inside a container network
+* Running the full stack with `docker compose up`, `docker compose down`, `docker compose logs`, `docker compose ps`, and verifying both containers start, communicate, and serve `/check` correctly
+* Designing a professional, consistent JSON response contract for `/check` (API Contract, Response Schema, Consistency, Metadata) instead of an ad-hoc shape
+* Industry-standard HTTP rate-limit headers — `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After` — and why real APIs (GitHub, Stripe) put this metadata in headers rather than only in the JSON body
+* End-to-end MVP validation — allowed requests, denied requests, refill behavior, persistence across restarts, and persistence across a full Docker restart
+* Docker debugging fundamentals — `docker logs`, `docker compose logs`, `docker exec`, `docker inspect`, container exit codes, and restart policies
+* Why documentation (README, progress tracker, roadmap) matters as much as code in a professional repository
+
+Files Created:
+
+* Dockerfile (Go base image, dependency download, build, run)
+* docker-compose.yml (Go service + Redis service, networked together)
+* main.go (updated `/check` response contract + rate-limit headers)
+* README.md (updated to reflect Docker Compose usage and current project state)
+
+Problems Faced:
+
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* Docker solves "works on my machine" by packaging the application and its exact environment together into a portable image
+* Docker Compose exists on top of Docker because real applications are multi-container (Go + Redis here), and Compose lets both be defined, networked, and started together with one command
+* Inside a container network, services address each other by service name (`redis:6379`) rather than `localhost`, because each container has its own isolated network namespace — Container DNS resolves service names to the right container
+* A clean, consistent API contract (fixed JSON shape + standard headers) is what separates a "toy endpoint" from something that looks like a real product API
+* Rate-limit metadata belongs in headers (`X-RateLimit-*`, `Retry-After`) rather than being buried in the JSON body, matching the convention used by GitHub, Twitter, and Stripe
+* Validating an MVP means testing more than the happy path — refill correctness, restart persistence, and Docker-level restart persistence all had to be manually verified before calling this milestone done
+* This milestone is the official transition point: the project is no longer "a correct algorithm," it is now a containerized, resume-ready backend service that runs end-to-end with a single `docker compose up`
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+feat: resume ready MVP using docker compose
+
+Outcome:
+
+✅ Understood why containerization is necessary for production-style backend services
+
+✅ Wrote the project's Dockerfile (Go base image → build → run)
+
+✅ Wrote docker-compose.yml orchestrating the Go service and Redis service
+
+✅ Understood and verified container networking (`redis:6379` instead of `localhost:6379`)
+
+✅ Verified the full stack starts and communicates via `docker compose up`
+
+✅ Designed a clean, professional `/check` JSON response contract
+
+✅ Added standard HTTP rate-limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`)
+
+✅ Verified allowed requests, denied requests, refill, and persistence across restarts (including Docker restarts)
+
+✅ Learned baseline Docker debugging (`docker logs`, `docker compose logs`, `docker exec`, `docker inspect`)
+
+✅ Updated README, progress tracker, and roadmap for synchronization
+
+✅ Progress tracker updated
+
+✅ Roadmap synchronized
+
+✅ Commit pushed: "feat: resume ready MVP using docker compose"
+
+✅ **Resume-Ready MVP officially complete**
+
+Next Objective:
+
+Admin API — `POST/GET/PUT/DELETE /admin/clients`, Redis-backed client configuration CRUD (Phase 3 — Advanced Features)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## MVP Completion
+## Admin API
 
 Objectives:
 
-* Token Bucket
-* Redis Persistence
-* Atomic Updates
-* Docker Compose
-* /check Endpoint
-* Rate Limit Headers
+* Design REST CRUD endpoints for per-client configuration
+* `POST /admin/clients` — create client config
+* `GET /admin/clients` — read client config(s)
+* `PUT /admin/clients` — update client config
+* `DELETE /admin/clients` — delete client config
+* Persist client configs in Redis
+* Wire the rate limiter engine to load per-client config instead of only defaults
 
 Deliverable:
 
-Resume-Ready MVP
+Admin REST API for per-client rate limit configuration
 
 Completion Criteria:
 
-* Containerize the application and Redis using Docker Compose
-* Finalize the `/check` endpoint response contract
-* Add Rate Limit Headers (e.g. remaining tokens, retry-after) to responses
-* Confirm the full stack runs end-to-end via a single `docker-compose up`
+* All four CRUD endpoints implemented and manually tested
+* Client configs persisted in and read from Redis
+* `/check` endpoint respects a client's custom config when one exists, falling back to defaults otherwise
+* Progress tracker and roadmap updated to reflect completion
 
 Status:
 
@@ -1121,7 +1219,7 @@ Backend Basics
 ██████████ 100%
 
 Rate Limiter Core
-██████░░░░ 60%
+██████████ 100%
 
 Advanced Features
 ░░░░░░░░░░ 0%
@@ -1130,12 +1228,14 @@ Deployment
 ░░░░░░░░░░ 0%
 
 Documentation
-░░░░░░░░░░ 0%
+█░░░░░░░░░ 10%
 ```
 
 Current Estimated Progress:
 
-~42%
+~52%
+
+Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Documentation ticked up slightly from the README/progress/roadmap sync done on Day 8, but full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6.
 
 ---
 
