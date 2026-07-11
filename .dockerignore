@@ -1,0 +1,13 @@
+.git
+
+docs/
+notes/
+progress/
+roadmap/
+experiments/
+
+.vscode/
+
+*.log
+
+.gitignore
