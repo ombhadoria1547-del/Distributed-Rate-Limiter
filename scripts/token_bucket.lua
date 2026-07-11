@@ -37,4 +37,14 @@ redis.call(
     "last_refill", lastRefill
 )
 
-return allowed
+local retryAfter = 0
+
+if allowed == 0 then
+    retryAfter = math.ceil((1 - tokens) / refillRate)
+end
+
+return {
+    allowed,
+    math.floor(tokens),
+    retryAfter
+}

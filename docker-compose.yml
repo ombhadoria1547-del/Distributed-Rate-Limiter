@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:8
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:
