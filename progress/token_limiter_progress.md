@@ -356,7 +356,7 @@ Redis-backed Token Bucket
 
 Status:
 
-⬜ Pending
+✅ Completed
 
 ---
 
@@ -603,7 +603,7 @@ Never leave major completed work uncommitted.
 
 ✅ Token Bucket
 
-⬜ Lua Integration
+✅ Lua Integration
 
 ⬜ Docker Compose
 
@@ -1003,26 +1003,107 @@ Redis Lua Scripting — Atomic Operations, Redis EVAL, Race Condition Prevention
 
 ---
 
+## Day 7 — Redis-backed Token Bucket (Atomic Lua Scripting)
+
+Date:
+
+2026-07-11
+
+Hours Spent:
+
+~4–5 Hours
+
+Topics Learned:
+
+* Why the in-memory Token Bucket struct is no longer sufficient — Go memory doesn't survive restarts and can't be shared across multiple server instances
+* Race Conditions & Atomic Operations — why a GET → modify → SET sequence is dangerous, the check-then-act bug, and how it leads to double-spending tokens
+* What "atomic" actually means and why splitting logic into multiple separate Redis commands is unsafe under concurrent access
+* Redis Lua Scripting fundamentals — what Lua is, why Redis supports it, the `EVAL` command, and why Redis guarantees a Lua script runs as a single atomic unit
+* Designing the Redis-backed Token Bucket schema — converting the Go struct into a Redis Hash (keys, fields, token storage, timestamp storage) and how one client's bucket is separated from another's
+* Writing the full Lua script: read bucket → calculate elapsed time → refill → cap at capacity → consume token → save state → return result
+* Connecting Go to Lua — executing scripts with `Eval()`, passing parameters from Go into Lua, reading the returned result, and wiring it into the `/check` endpoint
+* Verification & concurrency validation — manually confirming persistence, refill correctness, consumption correctness, capacity capping, and that concurrent requests don't corrupt bucket state
+
+Files Created:
+
+* source/tokenbucket.lua (atomic refill + consume Lua script)
+* source/redis_bucket.go (Go ↔ Redis Lua integration layer)
+* main.go (updated `/check` endpoint to use the Redis-backed, Lua-atomic Token Bucket)
+
+Problems Faced:
+
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* A race condition occurs whenever two requests can interleave between reading and writing shared state — Redis Lua scripting eliminates this by executing the entire refill-and-consume sequence as one atomic operation
+* Lua is preferred over issuing multiple separate Redis commands because Redis guarantees a script runs to completion without any other command executing in between
+* The bucket's state (current tokens, max capacity, refill rate, last refill timestamp) maps directly onto a Redis Hash, with each client isolated by its own key
+* The exact refill/consume math from the in-memory version (Day 6) ports over unchanged — only the execution environment moves from Go into Lua
+* Concurrent requests hitting the same bucket key no longer corrupt state, since Redis serializes Lua script execution
+* This milestone marks the transition from a "toy" in-memory limiter to a genuinely distributed, production-style rate limiter
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+feat: redis-backed token bucket using atomic lua scripting
+
+Outcome:
+
+✅ Understood why the in-memory implementation could not survive concurrency or restarts
+
+✅ Understood race conditions and why atomicity is required
+
+✅ Learned Redis Lua Scripting and the `EVAL` command
+
+✅ Designed the Redis Hash schema for the Token Bucket
+
+✅ Implemented the full refill + consume + cap + save logic as an atomic Lua script
+
+✅ Connected Go to the Lua script via `Eval()` and wired it into `/check`
+
+✅ Verified bucket persistence, refill correctness, and capacity capping
+
+✅ Verified no race conditions occur under concurrent requests
+
+✅ Progress tracker updated
+
+✅ Roadmap synchronized (no structural changes required)
+
+✅ Commit pushed: "feat: redis-backed token bucket using atomic lua scripting"
+
+Next Objective:
+
+MVP Completion — Docker Compose, finalized `/check` Endpoint, Rate Limit Headers (Resume-Ready MVP)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## Redis Lua Scripting
+## MVP Completion
 
 Objectives:
 
-* Atomic Operations
-* Redis EVAL
-* Race Condition Prevention
+* Token Bucket
+* Redis Persistence
+* Atomic Updates
+* Docker Compose
+* /check Endpoint
+* Rate Limit Headers
 
 Deliverable:
 
-Redis-backed Token Bucket
+Resume-Ready MVP
 
 Completion Criteria:
 
-* Port the in-memory Token Bucket logic into a Redis-backed implementation
-* Implement the refill + consume logic as an atomic Lua script executed via EVAL
-* Verify no race conditions occur under concurrent requests
-* Confirm bucket state persists correctly in Redis between requests
+* Containerize the application and Redis using Docker Compose
+* Finalize the `/check` endpoint response contract
+* Add Rate Limit Headers (e.g. remaining tokens, retry-after) to responses
+* Confirm the full stack runs end-to-end via a single `docker-compose up`
 
 Status:
 
@@ -1040,7 +1121,7 @@ Backend Basics
 ██████████ 100%
 
 Rate Limiter Core
-███░░░░░░░ 30%
+██████░░░░ 60%
 
 Advanced Features
 ░░░░░░░░░░ 0%
@@ -1054,7 +1135,7 @@ Documentation
 
 Current Estimated Progress:
 
-~35%
+~42%
 
 ---
 
