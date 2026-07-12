@@ -396,7 +396,7 @@ DELETE /admin/clients
 
 Status:
 
-🟡 In Progress (Next Up)
+✅ Completed
 
 ---
 
@@ -410,7 +410,7 @@ Objectives:
 
 Status:
 
-⬜ Pending
+🟡 In Progress (Next Up)
 
 ---
 
@@ -612,7 +612,7 @@ Never leave major completed work uncommitted.
 
 ✅ Docker Compose
 
-⬜ Admin API
+✅ Admin API
 
 ⬜ Sliding Window
 
@@ -1178,29 +1178,104 @@ Admin API — `POST/GET/PUT/DELETE /admin/clients`, Redis-backed client configur
 
 ---
 
+## Day 9 — Admin API (Redis-backed Client Configuration)
+
+Date:
+
+2026-07-13
+
+Hours Spent:
+
+~5–6 Hours
+
+Topics Learned:
+
+* Why production systems separate public-facing APIs from admin APIs, and why admin functionality is modeled as its own set of endpoints rather than bolted onto `/check`
+* CRUD (Create, Read, Update, Delete) as a pattern, and Resource-Oriented API Design — designing around a `ClientConfig` resource instead of ad-hoc actions
+* HTTP method semantics for CRUD: `POST` (create), `GET` (read), `PUT` (update), `DELETE` (delete)
+* Request Body vs Query Parameters vs Path Parameters, and when each is the appropriate way to pass data into an endpoint
+* Designing the `ClientConfig` data model — Client ID, Rate, Burst, and an Algorithm field (kept as a preview field for the future Sliding Window milestone)
+* Why per-client configuration belongs in Redis rather than in-process memory — same durability/shared-state reasoning as the bucket state itself
+* Redis Hashes for structured configuration data, and key design (`rl:cfg:{client_id}`) so each client's config is isolated
+* The idea of Default Configuration vs Custom Configuration — a client with no stored config should transparently fall back to sane defaults instead of erroring
+* End-to-end integration discipline — building the routes first with in-memory handling, then wiring Redis underneath, then re-verifying `/check` still behaves correctly for both configured and unconfigured clients
+
+Files Created:
+
+* source/config.go (`ClientConfig` struct + default configuration values)
+* source/redis_config.go (Redis Hash CRUD logic for client configs — create, read, update, delete)
+* main.go (added `POST/GET/PUT/DELETE /admin/clients` routes; updated `/check` to load per-client config from Redis, falling back to defaults when none exists)
+
+Problems Faced:
+
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* Separating admin (configuration) concerns from the hot-path `/check` endpoint keeps the rate limiter engine decoupled from how its configuration is managed — the engine doesn't care whether config came from a default or from an admin-created override
+* Modeling `/admin/clients` as a resource (not a bag of actions) is what makes the CRUD verbs map cleanly onto HTTP methods
+* A Redis Hash is a natural fit for `ClientConfig` for the same reason it was a natural fit for bucket state on Day 7 — grouped fields under one isolated key per client
+* Falling back to default configuration when a Redis key is missing is what keeps `/check` safe for clients that were never explicitly configured — the system degrades gracefully instead of failing
+* The project is no longer a single hardcoded rate limit — it is now a configurable, per-client backend service, which is the entry point into Phase 3 — Advanced Features
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+feat: admin api for client configuration
+
+Outcome:
+
+✅ Understood Admin API design and CRUD resource modeling
+
+✅ Designed the `ClientConfig` data model (Client ID, Rate, Burst, Algorithm)
+
+✅ Implemented all four CRUD endpoints (`POST/GET/PUT/DELETE /admin/clients`)
+
+✅ Implemented Redis Hash-backed storage for client configurations (`rl:cfg:{client_id}`)
+
+✅ Wired `/check` to load per-client config from Redis, falling back to defaults when none exists
+
+✅ Manually tested Create, Read, Update, Delete against `/admin/clients`
+
+✅ Verified `/check?client_id=A` and `/check?client_id=B` respect independent per-client limits
+
+✅ Verified unknown clients continue to use default configuration correctly
+
+✅ Progress tracker updated
+
+✅ Roadmap synchronized
+
+✅ Commit pushed: "feat: admin api for client configuration"
+
+✅ **Admin API milestone officially complete**
+
+Next Objective:
+
+Sliding Window — Sorted Sets, Window Management, Alternative Algorithm (Phase 3 — Advanced Features)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## Admin API
+## Sliding Window
 
 Objectives:
 
-* Design REST CRUD endpoints for per-client configuration
-* `POST /admin/clients` — create client config
-* `GET /admin/clients` — read client config(s)
-* `PUT /admin/clients` — update client config
-* `DELETE /admin/clients` — delete client config
-* Persist client configs in Redis
-* Wire the rate limiter engine to load per-client config instead of only defaults
+* Redis Sorted Sets
+* Window Management
+* Alternative Algorithm (Sliding Window vs Token Bucket)
 
 Deliverable:
 
-Admin REST API for per-client rate limit configuration
+Sliding Window rate limiting algorithm, Redis-backed
 
 Completion Criteria:
 
-* All four CRUD endpoints implemented and manually tested
-* Client configs persisted in and read from Redis
-* `/check` endpoint respects a client's custom config when one exists, falling back to defaults otherwise
+* Sliding Window logic implemented using Redis Sorted Sets
+* Manually verified against known request patterns
 * Progress tracker and roadmap updated to reflect completion
 
 Status:
@@ -1222,7 +1297,7 @@ Rate Limiter Core
 ██████████ 100%
 
 Advanced Features
-░░░░░░░░░░ 0%
+██▌░░░░░░░ 25%
 
 Deployment
 ░░░░░░░░░░ 0%
@@ -1233,9 +1308,9 @@ Documentation
 
 Current Estimated Progress:
 
-~52%
+~56%
 
-Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Documentation ticked up slightly from the README/progress/roadmap sync done on Day 8, but full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6.
+Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Advanced Features moved to 25% with the completion of the Admin API (Redis-backed per-client configuration CRUD) on Day 9 — Sliding Window, Strategy Pattern, and Robustness remain pending within this phase. Documentation ticked up slightly from the README/progress/roadmap sync done on Day 8, but full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6.
 
 ---
 
