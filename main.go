@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ombhadoria1547-del/Distributed-Rate-Limiter/source"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -37,8 +38,8 @@ func main() {
 		panic(err)
 	}
 
-	capacity := 10.0
-	refillRate := 1.0
+	defaultCapacity := 10.0
+	defaultRefillRate := 1.0
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -77,6 +78,124 @@ func main() {
 		})
 	})
 
+	router.POST("/admin/clients", func(c *gin.Context) {
+
+		var config source.ClientConfig
+
+		if err := c.ShouldBindJSON(&config); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid request body",
+			})
+			return
+		}
+
+		if config.ClientID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "client_id is required",
+			})
+			return
+		}
+
+		err := source.SaveClientConfig(ctx, client, config)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to save client configuration",
+			})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{
+			"message": "client created",
+			"client":  config,
+		})
+	})
+
+	router.GET("/admin/clients", func(c *gin.Context) {
+
+		configs, err := source.GetAllClientConfigs(ctx, client)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to fetch client configurations",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, configs)
+
+	})
+
+	router.PUT("/admin/clients", func(c *gin.Context) {
+
+		var config source.ClientConfig
+
+		if err := c.ShouldBindJSON(&config); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid request body",
+			})
+			return
+		}
+
+		if config.ClientID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "client_id is required",
+			})
+			return
+		}
+
+		err := source.UpdateClientConfig(ctx, client, config)
+
+		if err == redis.Nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "client not found",
+			})
+			return
+		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to update client configuration",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "client updated",
+			"client":  config,
+		})
+	})
+
+	router.DELETE("/admin/clients", func(c *gin.Context) {
+
+		clientID := c.Query("client_id")
+
+		if clientID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "client_id query parameter is required",
+			})
+			return
+		}
+
+		err := source.DeleteClientConfig(ctx, client, clientID)
+
+		if err == redis.Nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "client not found",
+			})
+			return
+		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to delete client configuration",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "client deleted",
+		})
+	})
+
 	router.GET("/check", func(c *gin.Context) {
 
 		clientID := c.Query("client_id")
@@ -86,6 +205,22 @@ func main() {
 				"error": "client_id query parameter is required",
 			})
 			return
+		}
+
+		capacity := defaultCapacity
+		refillRate := defaultRefillRate
+
+		config, err := source.GetClientConfig(ctx, client, clientID)
+		if err != nil && err != redis.Nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to load client configuration",
+			})
+			return
+		}
+
+		if err == nil {
+			capacity = config.Burst
+			refillRate = config.Rate
 		}
 
 		bucketKey := "bucket:" + clientID
