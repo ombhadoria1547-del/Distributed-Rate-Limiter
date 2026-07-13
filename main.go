@@ -33,13 +33,19 @@ func main() {
 		panic(err)
 	}
 
-	script, err := os.ReadFile("scripts/token_bucket.lua")
+	tokenBucketScript, err := os.ReadFile("scripts/token_bucket.lua")
+	if err != nil {
+		panic(err)
+	}
+
+	slidingWindowScript, err := os.ReadFile("scripts/sliding_window.lua")
 	if err != nil {
 		panic(err)
 	}
 
 	defaultCapacity := 10.0
 	defaultRefillRate := 1.0
+	defaultWindowSize := int64(10)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -94,6 +100,10 @@ func main() {
 				"error": "client_id is required",
 			})
 			return
+		}
+
+		if config.Algorithm == "" {
+			config.Algorithm = "token_bucket"
 		}
 
 		err := source.SaveClientConfig(ctx, client, config)
@@ -209,6 +219,7 @@ func main() {
 
 		capacity := defaultCapacity
 		refillRate := defaultRefillRate
+		algorithm := "token_bucket"
 
 		config, err := source.GetClientConfig(ctx, client, clientID)
 		if err != nil && err != redis.Nil {
@@ -221,20 +232,53 @@ func main() {
 		if err == nil {
 			capacity = config.Burst
 			refillRate = config.Rate
+
+			if config.Algorithm != "" {
+				algorithm = config.Algorithm
+			}
 		}
 
 		bucketKey := "bucket:" + clientID
 
-		result, err := client.Eval(
-			ctx,
-			string(script),
-			[]string{
-				bucketKey,
-			},
-			time.Now().Unix(),
-			capacity,
-			refillRate,
-		).Result()
+		var result interface{}
+
+		if algorithm == "token_bucket" {
+
+			result, err = client.Eval(
+				ctx,
+				string(tokenBucketScript),
+				[]string{
+					bucketKey,
+				},
+				time.Now().Unix(),
+				capacity,
+				refillRate,
+			).Result()
+
+		} else if algorithm == "sliding_window" {
+
+			windowKey := "rl:window:" + clientID
+
+			result, err = client.Eval(
+				ctx,
+				string(slidingWindowScript),
+				[]string{
+					windowKey,
+				},
+				time.Now().Unix(),
+				defaultWindowSize,
+				capacity,
+				clientID+"-"+strconv.FormatInt(time.Now().UnixNano(), 10),
+			).Result()
+
+		} else {
+
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "unknown rate limiting algorithm",
+			})
+			return
+
+		}
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{

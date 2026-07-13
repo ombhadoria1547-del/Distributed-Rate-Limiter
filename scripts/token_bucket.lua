@@ -25,7 +25,7 @@ lastRefill = now
 
 local allowed = 0
 
-if tokens > 0 then
+if tokens >= 1 then
     tokens = tokens - 1
     allowed = 1
 end

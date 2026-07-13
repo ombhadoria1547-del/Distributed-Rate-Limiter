@@ -19,8 +19,9 @@ func SaveClientConfig(
 		ctx,
 		key,
 		map[string]interface{}{
-			"rate":  strconv.FormatFloat(config.Rate, 'f', -1, 64),
-			"burst": strconv.FormatFloat(config.Burst, 'f', -1, 64),
+			"rate":      strconv.FormatFloat(config.Rate, 'f', -1, 64),
+			"burst":     strconv.FormatFloat(config.Burst, 'f', -1, 64),
+			"algorithm": config.Algorithm,
 		},
 	).Err()
 }
@@ -52,10 +53,17 @@ func GetClientConfig(
 		return ClientConfig{}, err
 	}
 
+	algorithm := result["algorithm"]
+
+	if algorithm == "" {
+		algorithm = "token_bucket"
+	}
+
 	return ClientConfig{
-		ClientID: clientID,
-		Rate:     rate,
-		Burst:    burst,
+		ClientID:  clientID,
+		Rate:      rate,
+		Burst:     burst,
+		Algorithm: algorithm,
 	}, nil
 }
 
@@ -117,8 +125,9 @@ func UpdateClientConfig(
 		ctx,
 		key,
 		map[string]interface{}{
-			"rate":  strconv.FormatFloat(config.Rate, 'f', -1, 64),
-			"burst": strconv.FormatFloat(config.Burst, 'f', -1, 64),
+			"rate":      strconv.FormatFloat(config.Rate, 'f', -1, 64),
+			"burst":     strconv.FormatFloat(config.Burst, 'f', -1, 64),
+			"algorithm": config.Algorithm,
 		},
 	).Err()
 }
