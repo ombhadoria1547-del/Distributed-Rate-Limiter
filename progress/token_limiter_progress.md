@@ -425,7 +425,7 @@ Through common interface.
 
 Status:
 
-🟡 In Progress (Next Up)
+✅ Completed
 
 ---
 
@@ -439,7 +439,7 @@ Objectives:
 
 Status:
 
-⬜ Pending
+✅ Completed
 
 ---
 
@@ -561,7 +561,7 @@ token-limiter/
 └── README.md
 ```
 
-Current Additions (as of Day 10):
+Current Additions (as of Day 11):
 
 ```text
 Dockerfile
@@ -570,6 +570,9 @@ scripts/
     sliding_window.lua
 source/
     redis_window.go
+    limiter.go
+    strategy.go
+    validation.go
 ```
 
 Future additions:
@@ -618,6 +621,8 @@ Never leave major completed work uncommitted.
 ✅ Admin API
 
 ✅ Sliding Window
+
+✅ Strategy Pattern & Robustness
 
 ⬜ Load Testing
 
@@ -1342,26 +1347,120 @@ Strategy Pattern — unify Token Bucket and Sliding Window behind a common rate-
 
 ---
 
+## Day 11 — Strategy Pattern & Production Robustness
+
+Date:
+
+2026-07-15
+
+Hours Spent:
+
+~5–6 Hours
+
+Topics Learned:
+
+* Why letting `/check` branch on algorithm type (`if algo == token_bucket ... else if algo == sliding_window ...`) is an architectural weakness — every new algorithm would force an edit to already-working code
+* The Open/Closed Principle (SOLID) — software should be open for extension but closed for modification, illustrated with the shipping-method analogy (Road/Air/Express/Drone/Pickup all implementing one interface instead of branching in checkout code)
+* The Strategy Pattern itself — a behavioral design pattern where multiple algorithms share one common interface and become interchangeable at runtime (`Limiter.Allow()` instead of `if TokenBucket ... else SlidingWindow`)
+* Why the pattern was invented historically — separating "what" (the interface) from "how" (the algorithm behind it) to avoid ever-growing if/else and switch chains
+* Where Strategy Pattern shows up across the industry — compression algorithms, payment gateways, authentication providers, sorting libraries, caching engines, database drivers, load balancers, routing engines, cloud SDKs
+* Refactoring discipline — moving algorithm-specific logic out of the HTTP handler so `/check` only loads config, selects a strategy, invokes the interface, and formats the response, while the algorithms themselves stay HTTP-agnostic (conceptual dependency inversion)
+* Input Validation — why malformed input (missing `client_id`, negative rate/burst, unsupported algorithm names, invalid JSON) must be rejected early with clear `400 Bad Request` responses instead of being allowed to corrupt behavior
+* Logging fundamentals — why logs are the primary source of truth once a service is running without a debugger attached, and keeping the hot path free of noisy per-request logs while still logging startup and significant errors
+* Fail-Open vs. Fail-Closed — the tradeoff between availability (allow requests when Redis is down) and correctness/protection (deny requests when enforcement can't be guaranteed), and choosing Fail-Closed for this project since it's easier to defend in an interview and better protects the service
+* Re-verification discipline — confirming that a refactor changes structure, not behavior, by re-testing Token Bucket, Sliding Window, the Admin API, default configuration, and the full Docker stack after the rewrite
+
+Files Created:
+
+* source/limiter.go (`RateLimiter` interface definition — a single `Allow(clientID)` contract both algorithms satisfy)
+* source/strategy.go (selector/factory that picks Token Bucket or Sliding Window based on per-client config)
+* source/validation.go (request validation logic — missing/invalid `client_id`, negative rate/burst, unsupported algorithm names)
+* source/tokenbucket.go, source/redis_bucket.go, source/redis_window.go (updated so both algorithms satisfy the new `RateLimiter` interface instead of being called directly)
+* main.go (`/check` refactored to call the `RateLimiter` interface instead of branching on algorithm type; added validation error responses, basic logging, and Fail-Closed handling for Redis failures)
+
+Problems Faced:
+
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* Branching on algorithm type inside `/check` was fine for two algorithms but would not scale — the Strategy Pattern removes that coupling entirely by making `/check` depend only on an interface, not on any specific implementation
+* The Open/Closed Principle is the real justification for the refactor: adding a future algorithm (e.g. Fixed Window, Leaky Bucket) now means implementing the interface, not editing `/check`
+* A clean interface boundary (`Allow()`) is what makes Token Bucket and Sliding Window genuinely interchangeable at runtime, which is the same idea used by payment gateways, compression libraries, and database drivers industry-wide
+* Robustness is a different concern from correctness — the algorithms were already correct, but validation, logging, and a defined Fail-Open/Fail-Closed policy are what separate a "working prototype" from something that behaves predictably in production
+* Choosing Fail-Closed over Fail-Open is a defensible, explainable tradeoff (protection over availability) rather than an arbitrary choice — exactly the kind of design decision worth bringing to an interview
+* Re-testing everything after the refactor confirmed the golden rule of refactoring: behavior stayed identical while the internal structure got significantly cleaner
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+refactor: strategy pattern for rate limiter + robustness (validation, logging, fail-closed)
+
+Outcome:
+
+✅ Understood why algorithm-branching in `/check` doesn't scale, and why the Open/Closed Principle applies here
+
+✅ Understood the Strategy Pattern and where it's used across the industry
+
+✅ Defined a common `RateLimiter` interface
+
+✅ Token Bucket implements the `RateLimiter` interface
+
+✅ Sliding Window implements the `RateLimiter` interface
+
+✅ `/check` refactored to call the interface instead of branching on algorithm type
+
+✅ Added request validation with clear `400 Bad Request` error responses
+
+✅ Added basic logging (startup, significant errors, Redis failures)
+
+✅ Chose and implemented a Fail-Closed policy for Redis failures
+
+✅ Re-tested Token Bucket, Sliding Window, Admin API, and default configuration — all unchanged after the refactor
+
+✅ Re-verified full Docker stack (`docker compose up`) still behaves correctly post-refactor
+
+✅ Progress tracker updated
+
+✅ Roadmap synchronized (no structural changes required)
+
+✅ Commit pushed: "refactor: strategy pattern for rate limiter + robustness (validation, logging, fail-closed)"
+
+✅ **Strategy Pattern & Robustness milestone officially complete**
+
+Next Objective:
+
+Load Testing — Throughput Validation, Concurrency Validation, Correctness Validation against a 500+ requests/second target (Phase 4 — Validation)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## Strategy Pattern
+## Load Testing
 
 Objectives:
 
-* Token Bucket
-* Sliding Window
+* Throughput Validation
+* Concurrency Validation
+* Correctness Validation
 
-Through a common interface.
+Target:
+
+500+ Requests / Second
 
 Deliverable:
 
-A shared rate-limiter interface/strategy abstraction that `/check` calls without needing to know which algorithm is behind it.
+A load-testing suite (e.g. Vegeta/`hey`) that fires sustained concurrent traffic at `/check` and proves — not just measures — that allow/deny counts match the theoretical maximum, with zero double-spend violations.
 
 Completion Criteria:
 
-* Common interface defined for both algorithms
-* Token Bucket and Sliding Window both implement it
-* `/check` refactored to select a strategy rather than branching on algorithm type
+* Load-testing tool selected and set up
+* Sustained 500+ req/sec run against `/check`
+* Allow/Deny counts verified against Token Bucket and Sliding Window theory
+* Results captured (throughput, latency, correctness) for later inclusion in documentation
 * Progress tracker and roadmap updated to reflect completion
 
 Status:
@@ -1383,7 +1482,7 @@ Rate Limiter Core
 ██████████ 100%
 
 Advanced Features
-█████░░░░░ 50%
+██████████ 100%
 
 Deployment
 ░░░░░░░░░░ 0%
@@ -1394,9 +1493,9 @@ Documentation
 
 Current Estimated Progress:
 
-~60%
+~68%
 
-Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Advanced Features moved to 50% with the completion of the Sliding Window milestone (Redis Sorted Sets + atomic Lua-based window algorithm) on Day 10, following the Admin API on Day 9 — Strategy Pattern and Robustness remain pending within this phase. Documentation ticked up slightly from the README/progress/roadmap sync done on Day 8, but full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6.
+Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Advanced Features reached 100% on Day 11 with the completion of the Strategy Pattern refactor (common `RateLimiter` interface, Token Bucket and Sliding Window both implementing it, `/check` refactored to select a strategy) and Robustness (input validation, basic logging, Fail-Closed policy on Redis failure) — this closes out Phase 3 — Advanced Features entirely, following the Sliding Window milestone on Day 10 and the Admin API on Day 9. Documentation remains at 10% from the README/progress/roadmap sync done on Day 8; full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6. Next up: Phase 4 — Validation (Load Testing).
 
 ---
 
