@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ombhadoria1547-del/Distributed-Rate-Limiter/source"
@@ -30,18 +30,24 @@ func main() {
 
 	err := client.Ping(ctx).Err()
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to connect to Redis: %v", err)
 	}
+
+	log.Println("Successfully connected to Redis")
 
 	tokenBucketScript, err := os.ReadFile("scripts/token_bucket.lua")
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to load token_bucket.lua: %v", err)
 	}
+
+	log.Println("Loaded token_bucket.lua")
 
 	slidingWindowScript, err := os.ReadFile("scripts/sliding_window.lua")
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to load sliding_window.lua: %v", err)
 	}
+
+	log.Println("Loaded sliding_window.lua")
 
 	defaultCapacity := 10.0
 	defaultRefillRate := 1.0
@@ -102,8 +108,31 @@ func main() {
 			return
 		}
 
+		if config.Rate <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "rate must be greater than 0",
+			})
+			return
+		}
+
+		if config.Burst <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "burst must be greater than 0",
+			})
+			return
+		}
+
 		if config.Algorithm == "" {
 			config.Algorithm = "token_bucket"
+		}
+
+		if config.Algorithm != "token_bucket" &&
+			config.Algorithm != "sliding_window" {
+
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid algorithm",
+			})
+			return
 		}
 
 		err := source.SaveClientConfig(ctx, client, config)
@@ -217,10 +246,6 @@ func main() {
 			return
 		}
 
-		capacity := defaultCapacity
-		refillRate := defaultRefillRate
-		algorithm := "token_bucket"
-
 		config, err := source.GetClientConfig(ctx, client, clientID)
 		if err != nil && err != redis.Nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -229,58 +254,44 @@ func main() {
 			return
 		}
 
-		if err == nil {
-			capacity = config.Burst
-			refillRate = config.Rate
+		if err == redis.Nil {
 
-			if config.Algorithm != "" {
-				algorithm = config.Algorithm
+			config = source.ClientConfig{
+				ClientID:  clientID,
+				Rate:      defaultRefillRate,
+				Burst:     defaultCapacity,
+				Algorithm: "token_bucket",
 			}
 		}
 
-		bucketKey := "bucket:" + clientID
-
-		var result interface{}
-
-		if algorithm == "token_bucket" {
-
-			result, err = client.Eval(
-				ctx,
-				string(tokenBucketScript),
-				[]string{
-					bucketKey,
-				},
-				time.Now().Unix(),
-				capacity,
-				refillRate,
-			).Result()
-
-		} else if algorithm == "sliding_window" {
-
-			windowKey := "rl:window:" + clientID
-
-			result, err = client.Eval(
-				ctx,
-				string(slidingWindowScript),
-				[]string{
-					windowKey,
-				},
-				time.Now().Unix(),
-				defaultWindowSize,
-				capacity,
-				clientID+"-"+strconv.FormatInt(time.Now().UnixNano(), 10),
-			).Result()
-
-		} else {
-
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "unknown rate limiting algorithm",
-			})
-			return
-
+		if config.Algorithm == "" {
+			config.Algorithm = "token_bucket"
 		}
 
+		limiter, err := source.NewRateLimiter(
+			config,
+			client,
+			string(tokenBucketScript),
+			string(slidingWindowScript),
+			defaultWindowSize,
+		)
+
 		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		result, err := limiter.Allow(
+			ctx,
+			config,
+		)
+
+		if err != nil {
+
+			log.Printf("rate limiter execution failed: %v", err)
+
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "failed to execute rate limiter",
 			})
@@ -330,7 +341,7 @@ func main() {
 
 		c.Header(
 			"X-RateLimit-Limit",
-			strconv.FormatFloat(capacity, 'f', 0, 64),
+			strconv.FormatFloat(config.Burst, 'f', 0, 64),
 		)
 
 		c.Header(
@@ -363,5 +374,9 @@ func main() {
 
 	})
 
-	router.Run(":8080")
+	log.Println("HTTP server starting on :8080")
+
+	if err := router.Run(":8080"); err != nil {
+		log.Fatalf("failed to start HTTP server: %v", err)
+	}
 }
