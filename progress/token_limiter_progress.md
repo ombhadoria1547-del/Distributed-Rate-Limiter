@@ -410,7 +410,7 @@ Objectives:
 
 Status:
 
-🟡 In Progress (Next Up)
+✅ Completed
 
 ---
 
@@ -425,7 +425,7 @@ Through common interface.
 
 Status:
 
-⬜ Pending
+🟡 In Progress (Next Up)
 
 ---
 
@@ -561,11 +561,15 @@ token-limiter/
 └── README.md
 ```
 
-Current Additions (as of Day 8):
+Current Additions (as of Day 10):
 
 ```text
 Dockerfile
 docker-compose.yml
+scripts/
+    sliding_window.lua
+source/
+    redis_window.go
 ```
 
 Future additions:
@@ -573,7 +577,6 @@ Future additions:
 ```text
 cmd/
 internal/
-scripts/
 loadtest/
 ```
 
@@ -614,7 +617,7 @@ Never leave major completed work uncommitted.
 
 ✅ Admin API
 
-⬜ Sliding Window
+✅ Sliding Window
 
 ⬜ Load Testing
 
@@ -1258,24 +1261,107 @@ Sliding Window — Sorted Sets, Window Management, Alternative Algorithm (Phase 
 
 ---
 
+## Day 10 — Sliding Window Rate Limiter (Redis Sorted Sets)
+
+Date:
+
+2026-07-14
+
+Hours Spent:
+
+~5–6 Hours
+
+Topics Learned:
+
+* Why Token Bucket alone isn't sufficient, and why Sliding Window was invented as a stricter, more precise alternative
+* Conceptual differences between Fixed Window, Token Bucket, and Sliding Window — burst tolerance vs. strictness tradeoffs, and why companies keep more than one algorithm available
+* Redis Sorted Sets (ZSET) as a new data structure — Score, Member, and why ordering (not just grouping, as with Hashes) was needed
+* Core Sorted Set commands required for this project: `ZADD`, `ZREMRANGEBYSCORE`, `ZCARD`, and basic `ZRANGE` — nothing beyond these
+* Manually experimenting in the Redis CLI — creating a Sorted Set, inserting timestamps, removing expired entries, and counting what remains, before writing any Go code
+* The Sliding Window algorithm itself: remove expired timestamps → count remaining requests → if count is under the limit, allow and insert the current timestamp → otherwise, deny
+* Manually solving Sliding Window request patterns on paper before coding (e.g. 8 requests against a 5-per-10-second limit) to understand the algorithm mathematically first
+* Porting the algorithm into a Redis-backed, Lua-atomic implementation — reusing the same atomicity approach proven with Token Bucket on Day 7
+* Wiring the Sliding Window path into the existing `/check` endpoint alongside Token Bucket
+* Manually comparing Sliding Window vs. Token Bucket behavior side-by-side under identical request patterns, and articulating the tradeoffs between the two
+
+Files Created:
+
+* scripts/sliding_window.lua (atomic expire + count + insert Lua script using Sorted Sets)
+* source/redis_window.go (Go ↔ Redis Sorted Set integration layer for Sliding Window)
+* main.go (updated to route requests to Sliding Window when configured, alongside the existing Token Bucket path)
+
+Problems Faced:
+
+* None blocking — completed without major issues
+
+Key Learnings:
+
+* Sorted Sets store timestamps as scored members, which makes "remove everything older than X" (`ZREMRANGEBYSCORE`) and "count what's left" (`ZCARD`) a natural fit for a moving time window — something Hashes alone couldn't express
+* Sliding Window is fundamentally stricter than Token Bucket: it enforces a hard cap on requests within any rolling window with no burst allowance beyond the limit, whereas Token Bucket explicitly permits bursts up to bucket capacity
+* The same atomicity principle from Day 7 (wrap the entire read-modify-write sequence in a single Lua script) applies identically here — expire-then-count-then-insert must happen as one atomic unit to prevent double-counting under concurrent requests
+* Comparing both algorithms against identical request patterns made the tradeoff concrete rather than theoretical — Token Bucket allowed a burst that Sliding Window correctly denied, which is exactly the kind of before/after evidence worth bringing to an interview
+* The rate limiter engine now genuinely supports two distinct algorithms end-to-end, which sets up the next step: extracting a common Strategy interface so `/check` doesn't need to know which algorithm it's calling
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+feat: sliding window rate limiter using redis sorted sets
+
+Outcome:
+
+✅ Understood why Sliding Window was invented and when it's preferred over Token Bucket
+
+✅ Learned Redis Sorted Sets (`ZADD`, `ZREMRANGEBYSCORE`, `ZCARD`, basic `ZRANGE`)
+
+✅ Solved Sliding Window request patterns manually before implementing them
+
+✅ Implemented the Sliding Window algorithm as an atomic Lua script using Sorted Sets
+
+✅ Connected Go to the new Lua script via `redis_window.go` and wired it into `/check`
+
+✅ Added new Redis key pattern `rl:window:{clientID}` for per-client request timestamps
+
+✅ Manually verified allow/deny behavior and window movement as time progressed
+
+✅ Manually compared Sliding Window vs. Token Bucket under identical request patterns
+
+✅ Progress tracker updated
+
+✅ Roadmap synchronized (no structural changes required)
+
+✅ Commit pushed: "feat: sliding window rate limiter using redis sorted sets"
+
+✅ **Sliding Window milestone officially complete**
+
+Next Objective:
+
+Strategy Pattern — unify Token Bucket and Sliding Window behind a common rate-limiter interface (Phase 3 — Advanced Features)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## Sliding Window
+## Strategy Pattern
 
 Objectives:
 
-* Redis Sorted Sets
-* Window Management
-* Alternative Algorithm (Sliding Window vs Token Bucket)
+* Token Bucket
+* Sliding Window
+
+Through a common interface.
 
 Deliverable:
 
-Sliding Window rate limiting algorithm, Redis-backed
+A shared rate-limiter interface/strategy abstraction that `/check` calls without needing to know which algorithm is behind it.
 
 Completion Criteria:
 
-* Sliding Window logic implemented using Redis Sorted Sets
-* Manually verified against known request patterns
+* Common interface defined for both algorithms
+* Token Bucket and Sliding Window both implement it
+* `/check` refactored to select a strategy rather than branching on algorithm type
 * Progress tracker and roadmap updated to reflect completion
 
 Status:
@@ -1297,7 +1383,7 @@ Rate Limiter Core
 ██████████ 100%
 
 Advanced Features
-██▌░░░░░░░ 25%
+█████░░░░░ 50%
 
 Deployment
 ░░░░░░░░░░ 0%
@@ -1308,9 +1394,9 @@ Documentation
 
 Current Estimated Progress:
 
-~56%
+~60%
 
-Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Advanced Features moved to 25% with the completion of the Admin API (Redis-backed per-client configuration CRUD) on Day 9 — Sliding Window, Strategy Pattern, and Robustness remain pending within this phase. Documentation ticked up slightly from the README/progress/roadmap sync done on Day 8, but full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6.
+Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Advanced Features moved to 50% with the completion of the Sliding Window milestone (Redis Sorted Sets + atomic Lua-based window algorithm) on Day 10, following the Admin API on Day 9 — Strategy Pattern and Robustness remain pending within this phase. Documentation ticked up slightly from the README/progress/roadmap sync done on Day 8, but full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6.
 
 ---
 
