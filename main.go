@@ -410,9 +410,14 @@ func main() {
 
 	})
 
-	log.Println("HTTP server starting on :8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 
-	if err := router.Run(":8080"); err != nil {
+	log.Printf("Listening on port %s", port)
+
+	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("failed to start HTTP server: %v", err)
 	}
 }
