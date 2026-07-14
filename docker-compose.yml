@@ -4,6 +4,7 @@ services:
 
     environment:
       BENCHMARK_MODE: ${BENCHMARK_MODE:-false}
+      REDIS_ADDR: redis:6379
 
     ports:
       - "8080:8080"
