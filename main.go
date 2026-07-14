@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ombhadoria1547-del/Distributed-Rate-Limiter/source"
@@ -37,13 +38,29 @@ func main() {
 	}
 
 	redisAddr := os.Getenv("REDIS_ADDR")
+
 	if redisAddr == "" {
 		redisAddr = "redis:6379"
 	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
-	})
+	var client *redis.Client
+
+	if strings.HasPrefix(redisAddr, "redis://") || strings.HasPrefix(redisAddr, "rediss://") {
+
+		opts, err := redis.ParseURL(redisAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		client = redis.NewClient(opts)
+
+	} else {
+
+		client = redis.NewClient(&redis.Options{
+			Addr: redisAddr,
+		})
+
+	}
 
 	ctx := context.Background()
 
