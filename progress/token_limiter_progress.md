@@ -1437,30 +1437,157 @@ Load Testing — Throughput Validation, Concurrency Validation, Correctness Vali
 
 ---
 
+## Day 12 — Load Testing & Correctness Validation (k6)
+
+Date:
+
+2026-07-16
+
+Hours Spent:
+
+~7–8 Hours
+
+Topics Learned:
+
+* Why Load Testing exists as its own engineering discipline — the difference between Functional Testing (does it work?) and Performance Testing (does it work under realistic concurrent load?), and why passing manual/Postman-level tests says nothing about production readiness
+* Performance Engineering fundamentals — Throughput, Latency, Capacity, Reliability, Bottlenecks, Resource Utilization, and why "it responds in 20ms" is meaningless without stating the concurrency it was measured under
+* k6 as a tool — Virtual Users (VUs), Scenarios, Executors, the JavaScript scripting model, built-in metrics/thresholds, and why k6 was chosen over Vegeta/JMeter/Locust for this project
+* Performance metrics in depth — Throughput vs. Latency, why p95/p99 percentiles matter far more than averages, Error Rate, Saturation, and how to read a k6 report as engineering evidence rather than a screenshot
+* Correctness Validation as a discipline distinct from performance — why a faster rate limiter that over-allows requests is strictly worse than a slower one that stays mathematically correct, using the "double-spend" framing (two requests must never consume the same token)
+* Designing a validation strategy *before* writing any test code — splitting testing into deliberate scenarios (Baseline, Token Bucket Validation, Sliding Window Validation, Sustained Load, Stress Observation) instead of one undirected benchmark
+* Building a reusable, version-controlled load-testing suite rather than a one-off script — so the exact same test can be re-run later to compare before/after any optimization
+* Hypothesis-driven performance debugging — systematically ruling out Redis, Lua, and transport-layer causes before correctly isolating the real bottleneck
+* Middleware as a hidden performance bottleneck — how a synchronous request logger can silently cap throughput far below what the actual rate-limiting logic is capable of
+* Configuration-driven application behavior — using environment variables to toggle application behavior (debug logging, benchmark mode) instead of editing source code between runs
+* Reading saturation from a throughput/latency curve — identifying the concurrency level at which added load stops increasing throughput and starts only increasing latency
+
+Files Created:
+
+* loadtest/scripts/baseline.js (low-traffic sanity test verifying k6 ↔ Go ↔ Redis connectivity end-to-end)
+* loadtest/scripts/token_bucket.js (Token Bucket correctness scenario — burst capacity + refill mathematics)
+* loadtest/scripts/sliding_window.js (Sliding Window correctness scenario — capacity + expiration)
+* loadtest/scripts/stress.js (sustained/stress load scenario for throughput and saturation testing)
+* loadtest/lib/config.js (centralized, reusable benchmark configuration — client IDs, VUs, duration)
+* loadtest/lib/token_bucket.js, loadtest/lib/sliding_window.js, loadtest/lib/stress.js (shared benchmark helper logic)
+* main.go (added `BENCHMARK_MODE` environment variable — switches between `gin.Default()` for development and `gin.New()` + `gin.Recovery()` for benchmarking, plus a startup log confirming the active mode)
+* docker-compose.yml (updated to pass `BENCHMARK_MODE` through as an environment variable, so behavior changes via configuration, not code edits)
+
+Problems Faced:
+
+* Initial benchmark runs produced inconsistent results — throughput would collapse and pause for minutes around ~27k cumulative requests, with the terminal continuing to print well after the test should have ended
+* Root cause was not obvious — Redis, the Lua scripts, and the transport layer were all initially suspected and individually investigated
+* Systematically ruled out, in order: Redis as the bottleneck, Lua script execution as the bottleneck, and transport/network failures — none of these were the cause
+* Eventually isolated the true cause: Gin's default request logger (`gin.Logger()`, enabled via `gin.Default()`) was synchronously logging every single HTTP request, which throttled throughput far below what the rate-limiting logic itself could sustain
+
+Key Learnings:
+
+* A fast algorithm can still be bottlenecked by something completely unrelated to its own logic — the token bucket and sliding window implementations were never the problem; the request logging middleware was
+* Hypothesis-driven debugging (systematically eliminating Redis → Lua → transport → middleware) is far more reliable than guessing, and mirrors how real infrastructure incidents get root-caused
+* Separating "development mode" from "benchmark mode" via configuration (`BENCHMARK_MODE`) rather than commenting out code is what makes a benchmark trustworthy and repeatable
+* Correctness must be validated independently of performance — the Token Bucket and Sliding Window scenarios proved burst capacity, refill math, window expiration, and capacity enforcement were all exactly correct, with zero double-spend behavior observed under concurrent traffic
+* Percentile latency (p95, max) tells a very different — and more honest — story than average latency, especially as concurrency increases
+* Throughput does not increase indefinitely with concurrency — the service's throughput/latency curve clearly showed a saturation point, beyond which added Virtual Users only increased latency without increasing throughput
+* Redis Hash/Sorted Set state (`bucket:{client_id}`, `rl:window:{client_id}`) needed to be reset to a known state before each correctness run to keep experiments clean and reproducible, especially at low refill rates
+* A load-testing suite is only genuinely useful if it's reusable — building it as versioned scripts under `loadtest/` (rather than ad-hoc terminal commands) means the exact same benchmark can be re-run after future optimizations to prove impact
+
+Benchmark Results (10-second runs, 0% errors across all runs):
+
+| Virtual Users | Throughput (req/s) | Avg Latency | p95 | Max |
+|---|---|---|---|---|
+| 10 | 7,820.44 | 1.22 ms | 1.71 ms | 6.52 ms |
+| 20 | 11,556.20 | 1.67 ms | 2.62 ms | 10.70 ms |
+| 30 | 14,019.40 | 2.08 ms | 3.21 ms | 16.31 ms |
+| 40 | 15,759.04 | 2.47 ms | 3.86 ms | 15.83 ms |
+| 50 | 17,169.20 | 2.85 ms | 4.42 ms | 19.42 ms |
+| 60 | 17,650.25 | 3.33 ms | 5.34 ms | 26.86 ms |
+| 70 | 16,736.15 | 4.11 ms | 6.86 ms | 29.27 ms |
+
+Test environment: Intel Core i5 (13th Gen), 16 GB RAM, Windows + Docker, Redis 8, Go + Gin, benchmarked with k6.
+
+Saturation Analysis:
+
+Peak throughput of ≈17.65k req/sec was reached at 60 Virtual Users. Beyond that point throughput slightly decreased while latency continued climbing — the service saturates at ~60 concurrent VUs on this development hardware, comfortably clearing the 500+ req/sec target by more than 30x.
+
+Correctness Validation Performed:
+
+* Token Bucket — burst capacity enforced exactly (429 returned immediately once the configured burst was exhausted); refill mathematics verified against Redis Hash state (`tokens`, `last_refill`) matching `New Tokens = Old Tokens + (Elapsed Time × Refill Rate)` precisely
+* Sliding Window — capacity enforced exactly (21st request denied against a 20-request/10-second window); expiration verified, with `ZREMRANGEBYSCORE` correctly evicting expired timestamps and requests being accepted again once the window rolled forward
+* Zero double-spend violations observed under concurrent traffic across all scenarios
+
+Git Commit Created:
+
+Yes
+
+Commit:
+
+test: add k6 load testing suite and validation report
+
+Outcome:
+
+✅ Understood why Load Testing and Performance Engineering are mandatory before deployment, distinct from functional testing
+
+✅ Understood k6 (Virtual Users, Scenarios, metrics, thresholds) and why it was chosen over Vegeta for this project
+
+✅ Understood performance metrics — Throughput, Latency, Percentiles (p50/p95/p99), Error Rate, Saturation, Bottlenecks
+
+✅ Understood Correctness Validation as a discipline distinct from and prioritized above raw performance
+
+✅ Designed a full validation strategy (Baseline, Token Bucket, Sliding Window, Sustained Load, Stress Observation) before writing any test code
+
+✅ Built a reusable, version-controlled k6 load-testing suite (`loadtest/scripts`, `loadtest/lib`)
+
+✅ Verified Token Bucket correctness under concurrent load (burst capacity + refill mathematics)
+
+✅ Verified Sliding Window correctness under concurrent load (capacity enforcement + expiration)
+
+✅ Confirmed zero double-spend violations and 0% error rate across all benchmark runs
+
+✅ Diagnosed and fixed a real performance bottleneck (Gin's synchronous request logger) via hypothesis-driven debugging
+
+✅ Added configuration-driven `BENCHMARK_MODE` (Go + Docker Compose) to toggle development vs. benchmark behavior without code changes
+
+✅ Sustained throughput far beyond the 500+ req/sec target — peak ≈17.65k req/sec at 60 VUs, saturation identified beyond that point
+
+✅ Captured full performance metrics (throughput, avg/p95/max latency) across a 10–70 VU sweep for documentation
+
+✅ Progress tracker updated
+
+✅ Roadmap synchronized (no structural changes required)
+
+✅ Commit pushed: "test: add k6 load testing suite and validation report"
+
+✅ **Load Testing & Correctness Validation milestone officially complete**
+
+Next Objective:
+
+Deployment — deploy the containerized service to a public host (Render/Railway/Fly.io) so the project has a live, recruiter-shareable URL (Phase 5 — Deployment)
+
+---
+
 # 🎯 CURRENT MILESTONE
 
-## Load Testing
+## Deployment
 
 Objectives:
 
-* Throughput Validation
-* Concurrency Validation
-* Correctness Validation
+* Public Hosting
+* Live Demo URL
+* Managed/Containerized Redis in Production
 
 Target:
 
-500+ Requests / Second
+A publicly reachable, recruiter-shareable live URL running the full Docker Compose stack (Go service + Redis).
 
 Deliverable:
 
-A load-testing suite (e.g. Vegeta/`hey`) that fires sustained concurrent traffic at `/check` and proves — not just measures — that allow/deny counts match the theoretical maximum, with zero double-spend violations.
+The Distributed Rate Limiter deployed to a free-tier host (Render, Railway, or Fly.io), with `/check` and `/admin/*` reachable over the public internet and behaving identically to the local Docker Compose stack.
 
 Completion Criteria:
 
-* Load-testing tool selected and set up
-* Sustained 500+ req/sec run against `/check`
-* Allow/Deny counts verified against Token Bucket and Sliding Window theory
-* Results captured (throughput, latency, correctness) for later inclusion in documentation
+* Hosting platform selected (Render / Railway / Fly.io)
+* Application deployed with Redis persistence intact
+* `/check` and `/admin/*` verified reachable and correct over the public URL
+* Live URL documented in README and progress tracker
 * Progress tracker and roadmap updated to reflect completion
 
 Status:
@@ -1484,18 +1611,21 @@ Rate Limiter Core
 Advanced Features
 ██████████ 100%
 
+Validation (Load Testing & Correctness)
+██████████ 100%
+
 Deployment
 ░░░░░░░░░░ 0%
 
 Documentation
-█░░░░░░░░░ 10%
+██░░░░░░░░ 20%
 ```
 
 Current Estimated Progress:
 
-~68%
+~80%
 
-Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Advanced Features reached 100% on Day 11 with the completion of the Strategy Pattern refactor (common `RateLimiter` interface, Token Bucket and Sliding Window both implementing it, `/check` refactored to select a strategy) and Robustness (input validation, basic logging, Fail-Closed policy on Redis failure) — this closes out Phase 3 — Advanced Features entirely, following the Sliding Window milestone on Day 10 and the Admin API on Day 9. Documentation remains at 10% from the README/progress/roadmap sync done on Day 8; full documentation (architecture diagram, API reference, load test results) is still pending until Phase 6. Next up: Phase 4 — Validation (Load Testing).
+Note: Rate Limiter Core hit 100% with the completion of the Resume-Ready MVP (Token Bucket + Redis persistence + atomic Lua + Docker Compose + Rate Limit Headers). Advanced Features reached 100% on Day 11 with the completion of the Strategy Pattern refactor and Robustness (validation, logging, Fail-Closed policy). Validation reached 100% on Day 12 with a full k6 load-testing suite, sustained throughput of ≈17.65k req/sec (far beyond the 500+ req/sec target), and mathematically verified correctness (zero double-spend violations) for both Token Bucket and Sliding Window under concurrent load — this closes out Phase 4 — Validation entirely. Documentation moved to 20% with the benchmark results and engineering log captured on Day 12, ready to feed into the final README; full documentation (architecture diagram, complete API reference) is still pending until Phase 6. Next up: Phase 5 — Deployment.
 
 ---
 
