@@ -20,7 +20,21 @@ type CheckResponse struct {
 
 func main() {
 
-	router := gin.Default()
+	benchmarkMode := os.Getenv("BENCHMARK_MODE") == "true"
+	log.Printf("Benchmark Mode: %v", benchmarkMode)
+
+	var router *gin.Engine
+
+	if benchmarkMode {
+
+		router = gin.New()
+		router.Use(gin.Recovery())
+
+	} else {
+
+		router = gin.Default()
+
+	}
 
 	client := redis.NewClient(&redis.Options{
 		Addr: "redis:6379",

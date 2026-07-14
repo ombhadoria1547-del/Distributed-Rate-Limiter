@@ -1,13 +1,19 @@
 services:
   app:
     build: .
+
+    environment:
+      BENCHMARK_MODE: ${BENCHMARK_MODE:-false}
+
     ports:
       - "8080:8080"
+
     depends_on:
       - redis
 
   redis:
     image: redis:8
+
     volumes:
       - redis-data:/data
 
