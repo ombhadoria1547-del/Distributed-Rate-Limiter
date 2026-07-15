@@ -50,7 +50,7 @@ The goal was not simply to "implement a rate limiter," but to understand how pro
 - **Fail-Closed error handling** — if Redis is unreachable, the service denies requests rather than silently allowing unlimited traffic
 - **Structured logging** — startup state and significant errors are logged; the request hot path stays free of noisy per-request logging
 - **Dockerized** — full stack (Go service + Redis) runs via a single `docker-compose up`
-- **Load-tested with k6** — throughput, latency, and correctness independently verified under concurrent load (see [Performance](#16-performance))
+- **Load-tested with k6** — throughput, latency, and correctness independently verified under concurrent load [`loadtest/results/performance-report.md`](loadtest/results/performance-report.md)
 - **Deployed to production** — live on Render with a managed Redis-compatible instance (Valkey), reachable over HTTPS
 
 ---
@@ -64,7 +64,7 @@ The goal was not simply to "implement a rate limiter," but to understand how pro
 | **Redis** | Shared state store | Extremely fast, supports atomic Lua scripting natively, and provides the exact primitives (Hashes, Sorted Sets, `EVAL`) this project's algorithms need | Stores token bucket state, sliding-window timestamps, and per-client configuration — the single source of truth |
 | **Lua (Redis `EVAL`)** | Atomic scripting | Redis executes a Lua script as one indivisible operation — the only mechanism used in this project to prevent concurrent requests from double-spending the same rate-limit budget | Implements the read-decide-write logic for both Token Bucket and Sliding Window as single atomic scripts |
 | **Docker / Docker Compose** | Containerization | Guarantees a consistent environment between development and deployment, and is the industry-standard packaging format for this class of service | Packages the Go service and Redis together for local development and as the deployable unit in production |
-| **k6** | Load testing | A modern, scriptable load-testing tool with built-in metrics/thresholds and a JavaScript scripting model, well suited to defining repeatable, version-controlled test scenarios | Drives the throughput, saturation, and correctness-under-load validation described in [Performance](#16-performance) and [Validation](#15-validation) |
+| **k6** | Load testing | A modern, scriptable load-testing tool with built-in metrics/thresholds and a JavaScript scripting model, well suited to defining repeatable, version-controlled test scenarios | Drives the throughput, saturation, and correctness-under-load validation described in [`loadtest/results/performance-report.md`](loadtest/results/performance-report.md) and [`loadtest/validation.md`](loadtest/validation.md) |
 | **Render (+ managed Redis/Valkey)** | Cloud hosting | A managed platform that supports Docker-based deployment and a managed Redis-compatible instance with private internal networking, without the operational overhead of self-managed infrastructure | Hosts the live, publicly reachable deployment of this service |
 
 ---
@@ -182,7 +182,7 @@ distributed-rate-limiter/
 ### Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/distributed-rate-limiter.git
+git clone https://github.com/<ombhadoria1547-del>/distributed-rate-limiter.git
 cd distributed-rate-limiter
 ```
 
